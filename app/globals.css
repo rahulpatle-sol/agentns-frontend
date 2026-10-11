@@ -1,26 +1,115 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+/* Custom Solana Explorer Colors */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0B0D12;
+  --surface: #12151C;
+  --border: #1F2430;
+  --foreground: #E6E8EE;
+  --muted: #8B93A7;
+  --accent: #7C5CFF;
+  --accent-foreground: #FFFFFF;
+  --accent-secondary: #22D3EE;
+  --status-green: #22C55E;
+  --status-amber: #F59E0B;
+  --status-red: #EF4444;
+  --status-blue: #3B82F6;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+/* Base styles */
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: var(--background);
+    --surface: var(--surface);
+    --border: var(--border);
+    --fg: var(--foreground);
+    --muted: var(--muted);
+    --accent: var(--accent);
+    --accent-secondary: var(--accent-secondary);
+    --status-green: var(--status-green);
+    --status-amber: var(--status-amber);
+    --status-red: var(--status-red);
+    --status-blue: var(--status-blue);
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--surface);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 4px;
+  }
+
+  /* Smooth transitions */
+  * {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Custom utilities */
+@layer utilities {
+  .bg-explorer {
+    background: var(--background);
+  }
+  
+  .surface {
+    background: var(--surface);
+  }
+  
+  .border-explorer {
+    border-color: var(--border);
+  }
+  
+  .text-explorer {
+    color: var(--foreground);
+  }
+  
+  .text-muted {
+    color: var(--muted);
+  }
+  
+  .accent {
+    background: linear-gradient(var(--accent), var(--accent-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .status-green {
+    color: var(--status-green);
+  }
+  
+  .status-amber {
+    color: var(--status-amber);
+  }
+  
+  .status-red {
+    color: var(--status-red);
+  }
+  
+  .status-blue {
+    color: var(--status-blue);
+  }
+}
+
+/* Focus ring */
+.focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
