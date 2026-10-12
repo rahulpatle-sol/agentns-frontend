@@ -182,7 +182,6 @@ export function useRecordsByOwner(owner: Address | null) {
       const response = await client.rpc
         .getProgramAccounts(address(agentnsProgramId), {
           encoding: "base64",
-          dataSlice: { offset: 0, length: 0 },
           filters: [
             {
               memcmp: {

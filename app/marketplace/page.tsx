@@ -249,6 +249,7 @@ export default function MarketplacePage() {
             wallet={wallet}
             config={config}
             isBusy={tx.isBusy}
+            onListName={() => setActiveTab('list')}
             mutateListings={mutateListings}
             mutateAgents={mutateAgents}
             mutateOwned={mutateOwned}
@@ -301,6 +302,7 @@ function BrowseListings({
   wallet,
   config,
   isBusy,
+  onListName,
   mutateListings,
   mutateAgents,
   mutateOwned,
@@ -312,6 +314,7 @@ function BrowseListings({
   wallet: ReturnType<typeof useWallet>;
   config: any;
   isBusy: boolean;
+  onListName: () => void;
   mutateListings: any;
   mutateAgents: any;
   mutateOwned: any;
@@ -404,7 +407,15 @@ function BrowseListings({
   if (listings.length === 0) {
     return (
       <div className="card p-12 text-center">
-        <EmptyState title="No active listings" description="Be the first to list a name, or check back later." />
+        <EmptyState
+          title="No active listings"
+          description="Only names explicitly listed for sale appear here. Registering a name does not list it automatically."
+        />
+        {wallet.isConnected && (
+          <Button variant="primary" className="mt-5" onClick={onListName}>
+            List one of my names
+          </Button>
+        )}
       </div>
     );
   }
