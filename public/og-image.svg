@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <rect width="1200" height="630" fill="#0b0b0a"/>
+  <!-- Film grain pattern -->
+  <defs>
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.08 0"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" filter="url(#noise)" opacity="0.07"/>
+  
+  <!-- Accent line -->
+  <line x1="120" y1="180" x2="1080" y2="180" stroke="#ff5a1f" stroke-width="2" stroke-linecap="round" stroke-dasharray="8 4"/>
+  
+  <!-- Main title -->
+  <text x="600" y="260" font-family="Georgia, serif" font-size="72" font-weight="400" fill="#ede8dd" text-anchor="middle" letter-spacing="-2">AgentNS</text>
+  <text x="600" y="340" font-family="Georgia, serif" font-size="36" font-weight="400" fill="#ff5a1f" text-anchor="middle" font-style="italic">Names for machines.</text>
+  
+  <!-- Subtitle -->
+  <text x="600" y="410" font-family="ui-monospace, monospace" font-size="18" fill="#8c877b" text-anchor="middle" letter-spacing="3">On-chain name registry & trust layer for AI agents</text>
+  
+  <!-- Badge -->
+  <rect x="500" y="460" width="200" height="44" rx="22" fill="rgba(237,232,221,0.06)" stroke="#ff5a1f" stroke-width="1"/>
+  <text x="600" y="490" font-family="ui-monospace, monospace" font-size="14" font-weight="600" fill="#ff5a1f" text-anchor="middle">Verify before you call</text>
+  
+  <!-- Bottom accent -->
+  <line x1="120" y1="540" x2="1080" y2="540" stroke="#ff5a1f" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="8 4"/>
+</svg>
