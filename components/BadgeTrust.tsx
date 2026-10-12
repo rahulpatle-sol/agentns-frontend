@@ -1,41 +1,23 @@
-import { CheckCircle, Clock, Leaf, Shield } from 'lucide-react';
-
 export interface BadgeTrustProps {
-  badge: 'Trusted' | 'Verified' | 'Staked' | 'New';
+  badge: 'Trusted' | 'Verified' | 'Staked' | 'New' | 'Revoked';
   size?: 'sm' | 'md';
 }
 
+const styles = {
+  Trusted: { dot: 'bg-ok', cls: 'border-ok/40 text-ok', label: 'Trusted' },
+  Verified: { dot: 'bg-fg', cls: 'border-fg/30 text-fg', label: 'Verified' },
+  Staked: { dot: 'bg-accent', cls: 'border-accent/40 text-accent', label: 'Staked' },
+  New: { dot: 'bg-muted', cls: 'border-line-strong text-muted', label: 'New' },
+  Revoked: { dot: 'bg-bad', cls: 'border-bad/40 text-bad', label: 'Revoked' },
+} as const;
+
 export function BadgeTrust({ badge, size = 'md' }: BadgeTrustProps) {
-  const sizes = { sm: 'w-6 h-6', md: 'w-8 h-8' };
-  const sizeClass = sizes[size];
-  
-  const colors = {
-    Trusted: 'bg-emerald-500/20 text-emerald-400',
-    Verified: 'bg-green-500/20 text-green-400',
-    Staked: 'bg-blue-500/20 text-blue-400',
-    New: 'bg-gray-500/20 text-gray-400',
-  };
-  
-  const labels = {
-    Trusted: 'Trusted',
-    Verified: 'Endpoint verified',
-    Staked: 'Staked',
-    New: 'New',
-  };
-  
-  const icons = {
-    Trusted: <Shield className="w-3 h-3" />,
-    Verified: <CheckCircle className="w-3 h-3" />,
-    Staked: <Leaf className="w-3 h-3" />,
-    New: <Clock className="w-3 h-3" />,
-  };
-  
+  const { dot, cls, label } = styles[badge];
+  const pad = size === 'sm' ? 'px-2 py-[3px] text-[10px]' : 'px-2.5 py-1 text-[11px]';
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-medium ${colors[badge]}`}>
-      <span className={`${sizeClass} flex items-center justify-center`}>
-        {icons[badge]}
-      </span>
-      <span className="text-explorer">{labels[badge]}</span>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap border font-mono uppercase tracking-[0.12em] ${pad} ${cls}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+      {label}
     </span>
   );
 }

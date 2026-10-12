@@ -1,52 +1,47 @@
 'use client';
 
-// DataTable: a reusable, sortable table used for the agents list (and other lists).
-// "use client" is needed because this component uses React state (useState).
+// DataTable: reusable, sortable table. "use client" because it keeps sort state.
 
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, SearchX } from 'lucide-react';
+import { EmptyState } from './EmptyState';
 
 type SortDirection = 'asc' | 'desc';
 
 /** Describes one column: which field to show, its title, and (optionally) how to draw the cell. */
 export interface DataTableColumn<T> {
-  /** Name of the field on each row object, for example "stakeLamports". */
   key: string;
-  /** Text shown in the column header. */
   label: string;
-  /** If true, clicking the header sorts the table by this column. */
   sortable?: boolean;
+  align?: 'left' | 'right';
   /** Optional custom cell. Receives the field value and the whole row. */
-  render?: (value: any, item: T) => ReactNode;
+  render?: (value: unknown, item: T) => ReactNode;
 }
 
 export interface DataTableProps<T> {
   data: T[];
   columns: DataTableColumn<T>[];
-  /** Called after the user changes the sort. Handy if the parent also sorts or fetches. */
   onSort?: (key: string, direction: SortDirection) => void;
-  /** Called when a row is clicked (or Enter is pressed on it). Use it to open the agent page. */
   onRowClick?: (item: T) => void;
-  /** Heading shown above the table. */
   title?: string;
-  /** Text shown when there are no rows. */
   emptyMessage?: string;
+  /** Stable key per row; falls back to the index. */
+  getRowKey?: (item: T, index: number) => string;
   className?: string;
-  /** Number of placeholder rows to show while loading (only used when data is empty). */
+  /** Number of placeholder rows while loading (only used when data is empty). */
   skeletonCount?: number;
+  loading?: boolean;
 }
 
-// Reads one field from a row. Rows are plain objects, so we read them by key.
-function getValue(item: unknown, key: string): any {
-  return (item as Record<string, any>)[key];
+function getValue(item: unknown, key: string): unknown {
+  return (item as Record<string, unknown>)[key];
 }
 
-// Compares two non-empty values: text uses localeCompare, everything else uses < and >.
-function compareValues(a: any, b: any): number {
+function compareValues(a: unknown, b: unknown): number {
   if (typeof a === 'string' && typeof b === 'string') return a.localeCompare(b);
-  if (a < b) return -1;
-  if (a > b) return 1;
+  if ((a as number) < (b as number)) return -1;
+  if ((a as number) > (b as number)) return 1;
   return 0;
 }
 
@@ -57,20 +52,19 @@ export function DataTable<T>({
   onRowClick,
   title = 'Agents',
   emptyMessage = 'No agents found',
+  getRowKey,
   className,
   skeletonCount = 0,
+  loading,
 }: DataTableProps<T>) {
-  // Which column is sorted and in which direction. null means "not sorted".
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
 
-  // Sort a copy of the data (never change the original array).
   const sortedData = useMemo(() => {
     if (!sortKey) return data;
     return [...data].sort((a, b) => {
       const aVal = getValue(a, sortKey);
       const bVal = getValue(b, sortKey);
-      // Empty values always go to the bottom, whatever the direction.
       const aEmpty = aVal === null || aVal === undefined;
       const bEmpty = bVal === null || bVal === undefined;
       if (aEmpty || bEmpty) return aEmpty === bEmpty ? 0 : aEmpty ? 1 : -1;
@@ -79,7 +73,6 @@ export function DataTable<T>({
     });
   }, [data, sortKey, sortDir]);
 
-  // Click on a header: same column flips the direction, a new column starts ascending.
   const handleSort = (key: string) => {
     const nextDir: SortDirection = sortKey === key && sortDir === 'asc' ? 'desc' : 'asc';
     setSortKey(key);
@@ -87,113 +80,108 @@ export function DataTable<T>({
     onSort?.(key, nextDir);
   };
 
-  // Loading = we were asked for skeleton rows and there is no data yet.
-  const isLoading = skeletonCount > 0 && data.length === 0;
+  const isLoading = loading ?? (skeletonCount > 0 && data.length === 0);
   const isEmpty = !isLoading && data.length === 0;
 
   return (
-    <div className={className ?? ''}>
-      <div className="bg-surface rounded-xl border border-explorer p-4">
-        <h3 className="text-lg font-medium text-explorer">{title}</h3>
+    <div className={`card overflow-hidden ${className ?? ''}`}>
+      <div className="flex items-center justify-between border-b border-line px-5 py-4">
+        <h3 className="text-base font-semibold tracking-tight">{title}</h3>
+        {!isLoading && (
+          <span className="rounded-full bg-fg/5 px-2.5 py-0.5 text-xs font-medium tabular-nums text-muted">
+            {data.length} {data.length === 1 ? 'result' : 'results'}
+          </span>
+        )}
+      </div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[640px]">
-            <thead>
-              <tr>
-                {columns.map((column) => {
-                  const isSorted = sortKey === column.key;
-                  return (
-                    <th
-                      key={column.key}
-                      scope="col"
-                      aria-sort={isSorted ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                      className="p-3 text-left text-xs font-medium uppercase tracking-wider text-muted"
-                    >
-                      {column.sortable ? (
-                        <button
-                          type="button"
-                          onClick={() => handleSort(column.key)}
-                          className="inline-flex items-center gap-1 uppercase tracking-wider transition-colors hover:text-explorer"
-                          aria-label={`Sort by ${column.label}`}
-                        >
-                          {column.label}
-                          {isSorted ? (
-                            sortDir === 'asc' ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )
-                          ) : (
-                            <ArrowUpDown className="h-3 w-3 opacity-40" />
-                          )}
-                        </button>
-                      ) : (
-                        column.label
-                      )}
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] border-collapse">
+          <thead>
+            <tr className="border-b border-line">
+              {columns.map((column) => {
+                const isSorted = sortKey === column.key;
+                return (
+                  <th
+                    key={column.key}
+                    scope="col"
+                    aria-sort={isSorted ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    className={`px-5 py-3 text-[11px] font-medium uppercase tracking-widest text-muted ${
+                      column.align === 'right' ? 'text-right' : 'text-left'
+                    }`}
+                  >
+                    {column.sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSort(column.key)}
+                        className={`inline-flex items-center gap-1.5 uppercase tracking-widest transition-colors hover:text-fg ${
+                          isSorted ? 'text-fg' : ''
+                        }`}
+                        aria-label={`Sort by ${column.label}`}
+                      >
+                        {column.label}
+                        {isSorted ? (
+                          sortDir === 'asc' ? <ArrowUp className="h-3 w-3 text-accent" /> : <ArrowDown className="h-3 w-3 text-accent" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-40" />
+                        )}
+                      </button>
+                    ) : (
+                      column.label
+                    )}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
 
-            <tbody>
-              {/* Loading: grey pulsing placeholder rows */}
-              {isLoading &&
-                Array.from({ length: skeletonCount }).map((_, rowIndex) => (
-                  <tr key={`skeleton-${rowIndex}`} className="border-t border-explorer">
-                    {columns.map((column) => (
-                      <td key={column.key} className="p-3">
-                        <div className="h-4 w-full max-w-[140px] animate-pulse rounded bg-white/10" />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-
-              {/* Empty: nothing to show */}
-              {isEmpty && (
-                <tr className="border-t border-explorer">
-                  <td colSpan={columns.length} className="p-6 text-center text-sm text-muted">
-                    {emptyMessage}
-                  </td>
+          <tbody>
+            {isLoading &&
+              Array.from({ length: skeletonCount || 6 }).map((_, rowIndex) => (
+                <tr key={`skeleton-${rowIndex}`} className="border-b border-line last:border-0">
+                  {columns.map((column, i) => (
+                    <td key={column.key} className="px-5 py-4">
+                      <div className={`skeleton h-4 ${i === 0 ? 'w-44' : 'w-20'}`} />
+                    </td>
+                  ))}
                 </tr>
-              )}
+              ))}
 
-              {/* Real rows */}
-              {sortedData.map((item, index) => (
+            {isEmpty && (
+              <tr>
+                <td colSpan={columns.length}>
+                  <EmptyState icon={SearchX} title={emptyMessage} description="Try a different search or loosen your filters." />
+                </td>
+              </tr>
+            )}
+
+            {!isLoading &&
+              sortedData.map((item, index) => (
                 <tr
-                  key={index}
+                  key={getRowKey ? getRowKey(item, index) : index}
                   onClick={onRowClick ? () => onRowClick(item) : undefined}
-                  onKeyDown={
-                    onRowClick
-                      ? (event) => {
-                          if (event.key === 'Enter') onRowClick(item);
-                        }
-                      : undefined
-                  }
+                  onKeyDown={onRowClick ? (e) => e.key === 'Enter' && onRowClick(item) : undefined}
                   tabIndex={onRowClick ? 0 : undefined}
-                  className={`border-t border-explorer transition-colors hover:bg-white/5 ${
+                  className={`group border-b border-line transition-colors last:border-0 hover:bg-accent/[0.06] ${
                     onRowClick ? 'cursor-pointer' : ''
                   }`}
                 >
                   {columns.map((column) => {
                     const value = getValue(item, column.key);
                     return (
-                      <td key={column.key} className="p-3 text-sm text-explorer">
-                        {column.render ? (
-                          column.render(value, item)
-                        ) : (
-                          <span className="font-medium">
-                            {value === null || value === undefined ? '-' : String(value)}
-                          </span>
+                      <td
+                        key={column.key}
+                        className={`px-5 py-3.5 text-sm ${column.align === 'right' ? 'text-right' : ''}`}
+                      >
+                        {column.render ? column.render(value, item) : (
+                          <span className="font-medium">{value === null || value === undefined ? '–' : String(value)}</span>
                         )}
                       </td>
                     );
                   })}
                 </tr>
               ))}
-            </tbody>
-          </table>
-        </div>
+          </tbody>
+        </table>
       </div>
     </div>
   );

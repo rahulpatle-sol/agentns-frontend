@@ -1,45 +1,26 @@
-export function SkeletonLine({
-  height = 12,
-  className,
-}: {
-  height?: number;
-  className?: string;
-}) {
+export function SkeletonLine({ height = 12, className }: { height?: number; className?: string }) {
+  return <div className={`skeleton ${className ?? ''}`} style={{ height }} />;
+}
+
+export function SkeletonAvatar({ className }: { className?: string }) {
+  return <div className={`skeleton h-10 w-10 !rounded-full ${className ?? ''}`} />;
+}
+
+export function SkeletonTextLine({ lines = 1, className }: { lines?: number; className?: string }) {
   return (
-    <div
-      className={`bg-surface/50 rounded ${className ?? ''}`}
-      style={{ animation: 'shimmer 2s ease-in-out infinite', height }}
-    />
+    <div className={`space-y-2 ${className ?? ''}`}>
+      {Array.from({ length: lines }).map((_, i) => (
+        <SkeletonLine key={i} height={14} className={i === lines - 1 && lines > 1 ? 'w-2/3' : 'w-full'} />
+      ))}
+    </div>
   );
 }
 
-export function SkeletonAvatar() {
-  return (
-    <div className="w-10 h-10 bg-surface/50 rounded-full animate-pulse" />
-  );
-}
-
-export function SkeletonTextLine(lines: number = 1, className?: string) {
-  const lineHeight = 16;
-  return (
-    <div
-      className={`bg-surface/50 rounded h-[${lineHeight}px] w-full ${className}`}
-      style={{ animation: 'shimmer 2s ease-in-out infinite', height: `${lineHeight}px` }}
-    />
-  );
-}
-
-export function SkeletonGrid({
-  rows = 2,
-  cols = 3,
-}: {
-  rows?: number;
-  cols?: number;
-} = {}) {
+export function SkeletonGrid({ rows = 2, cols = 3 }: { rows?: number; cols?: number } = {}) {
   return (
     <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-      {Array(rows * cols).fill(0).map((_, i) => (
-        <SkeletonLine key={i} height={8} />
+      {Array.from({ length: rows * cols }).map((_, i) => (
+        <SkeletonLine key={i} height={56} />
       ))}
     </div>
   );

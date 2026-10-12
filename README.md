@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AgentNS Frontend
 
-## Getting Started
+Explorer + registry UI for the [AgentNS](https://github.com/rahulpatle-sol/agentns) Solana program (AI-agent name registry).
+Next.js 16 · React 19 · Tailwind v4 · `@solana/kit` + Wallet Standard.
 
-First, run the development server:
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # already set to devnet + program id
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment (all PUBLIC values)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `VITE_SOLANA_CLUSTER` | `devnet` | `localnet` \| `devnet` \| `mainnet-beta` |
+| `VITE_SOLANA_RPC_URL` | `https://api.devnet.solana.com` | Use a dedicated RPC (Helius/QuickNode) — public devnet is rate-limited |
+| `VITE_SOLANA_WS_URL` | derived from RPC | optional |
+| `VITE_AGENTNS_PROGRAM_ID` | `3CZ5JZgJdxX2wt8UbmyP9kkHPmiMnHhnbsUAXWj7XdnD` | `declare_id!` of the program |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The `VITE_` prefix is kept so the same `.env` works with the program repo's Vite app; `next.config.ts` exposes them to the browser.
+Never put a private key in these variables.
 
-## Learn More
+## Pages
 
-To learn more about Next.js, take a look at the following resources:
+- `/` – Explorer: live agents read from the program (`getProgramAccounts`), search, filters, stats
+- `/register` – register a name (live name hash + PDA preview, cost breakdown, on-chain validation mirrors)
+- `/names` – names owned by the connected wallet
+- `/names/[pda]` – record details; owner can update endpoint, transfer, revoke
+- `/activity` – latest program transactions
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Wallet connect uses Wallet Standard (Phantom, Solflare, Backpack, …) — set the wallet to the same cluster as `VITE_SOLANA_CLUSTER`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Layout
 
-## Deploy on Vercel
+```
+app/            routes
+components/     UI (WalletButton, DataTable, StatCard, Toast, …)
+lib/program/    hand-written client for the Anchor program (borsh, PDAs, instruction builders)
+lib/state/      SWR read hooks, transaction hook, wallet hook
+lib/config.ts   cluster / RPC / program-id config
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Implemented instructions: `register_name`, `update_endpoint`, `transfer_name`, `revoke_name`.
+Marketplace (`list_name`, `buy_name`, `cancel_listing`) and stake management are not wired into the UI yet.

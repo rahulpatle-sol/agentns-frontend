@@ -1,94 +1,133 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Eye, Moon, Search, Settings, Sun } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { Moon, Sun, X } from 'lucide-react';
+import { WalletButton } from '@/components/WalletButton';
+import { activeCluster } from '@/lib/config';
+
+const links = [
+  { label: 'Registry', href: '/' },
+  { label: 'Marketplace', href: '/marketplace' },
+  { label: 'Register', href: '/register' },
+  { label: 'My names', href: '/names' },
+  { label: 'Activity', href: '/activity' },
+];
 
 export function Navigation() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const pathname = usePathname();
+  const router = useRouter();
+  const [scrolled, setScrolled] = useState(false);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setTheme(prefersDark ? 'dark' : 'light');
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   useEffect(() => {
-    const html = document.documentElement;
-    html.classList.toggle('dark', theme === 'dark');
-  }, [theme]);
+    document.body.style.overflow = open ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
 
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
-  };
-
-  const focusedInputRef = useRef<HTMLInputElement>(null);
+  const focusSearch = useCallback(() => {
+    const el = document.getElementById('hero-search') as HTMLInputElement | null;
+    if (!el) {
+      router.push('/');
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    el.focus({ preventScroll: true });
+  }, [router]);
 
   useEffect(() => {
-    if (searchQuery.length > 0) {
-      focusedInputRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        focusSearch();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [focusSearch]);
+
+  const toggleTheme = () => {
+    const next = !document.documentElement.classList.contains('light');
+    document.documentElement.classList.toggle('light', next);
+    try {
+      localStorage.setItem('theme', next ? 'light' : 'dark');
+    } catch {
+      /* storage unavailable */
     }
-  }, [searchQuery]);
+  };
+
+  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
 
   return (
-    <nav className="sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-explorer">
-      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-        {/* Logo and Title */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-explorer border border-explorer flex items-center justify-center">
-            <svg className="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path className="stroke-2" strokeWidth={2} d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path className="stroke-2" strokeWidth={2} d="M2 7h20a2 2 0 012 2v1a2 2 0 01-2 2H4a2 2 0 01-2-2v-1a2 2 0 012-2z" />
-            </svg>
-          </div>
-          <span className="text-lg font-bold tracking-tighter text-explorer">AgentNS</span>
-        </div>
+    <>
+      <header className={`sticky top-0 z-50 border-b transition-colors duration-300 ${scrolled || open ? 'border-line bg-bg/90 backdrop-blur-md' : 'border-transparent'}`}>
+        <nav className="mx-auto flex h-16 max-w-[1500px] items-center justify-between gap-6 px-5 sm:px-8" aria-label="Main">
+          <Link href="/" onClick={() => setOpen(false)} className="group flex items-baseline gap-2">
+            <span className="font-display text-[28px] leading-none">AgentNS</span>
+            <span className="h-1.5 w-1.5 translate-y-[-2px] rounded-full bg-accent transition-transform duration-500 group-hover:scale-[2.4]" />
+          </Link>
 
-        {/* Search Box */}
-        <div className="hidden md:flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-            <input
-              type="text"
-              placeholder="Search agent name, capability or owner wallet"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => setShowSuggestions(true)}
-              onBlur={() => setShowSuggestions(false)}
-              className="w-full pl-10 pr-4 py-2 rounded-full bg-surface border border-explorer focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent placeholder-text-muted"
-              ref={focusedInputRef}
-            />
-          </div>
-          <button
-            onClick={() => setShowSuggestions(!showSuggestions)}
-            className="p-2 rounded-lg hover:bg-surface/50 transition-colors"
-            aria-label="Search"
-          >
-            <Eye className="w-5 h-5" />
-          </button>
-        </div>
+          <ul className="hidden items-center gap-8 lg:flex">
+            {links.map((l) => (
+              <li key={l.href}>
+                <Link
+                  href={l.href}
+                  aria-current={isActive(l.href) ? 'page' : undefined}
+                  className={`link-u font-mono text-[11px] uppercase tracking-[0.14em] transition-colors hover:text-fg ${isActive(l.href) ? 'text-fg [background-size:100%_1px] [background-image:linear-gradient(var(--accent),var(--accent))]' : 'text-muted'}`}
+                >
+                  {l.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
 
-        {/* Network Pill and Actions */}
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-medium text-muted uppercase tracking-wider">Devnet</span>
-          <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-explorer">
-            <svg className="w-3 h-3 text-explorer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path className="stroke-2" strokeWidth={2} d="M12 1v4M12 19v4M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h4M19 12h4M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-            </svg>
-            <span className="text-xs text-muted">Connected</span>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={focusSearch}
+              className="hidden items-center gap-2 border border-line px-3 py-1.5 font-mono text-[11px] text-muted transition-colors hover:border-line-strong hover:text-fg md:flex"
+              aria-label="Search names"
+            >
+              Resolve a name <kbd className="border border-line px-1 text-[10px]">⌘K</kbd>
+            </button>
+            <span className="hidden items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted xl:inline-flex">
+              <span className="ping-dot relative h-1.5 w-1.5 rounded-full bg-ok" />
+              {activeCluster.label}
+            </span>
+            <button onClick={toggleTheme} className="grid h-9 w-9 place-items-center border border-line text-muted transition-colors hover:border-line-strong hover:text-fg" aria-label="Toggle theme">
+              <Sun className="h-4 w-4 light:hidden" />
+              <Moon className="hidden h-4 w-4 light:block" />
+            </button>
+            <WalletButton />
+            <button onClick={() => setOpen((o) => !o)} className="grid h-9 w-9 place-items-center border border-line lg:hidden" aria-label="Menu" aria-expanded={open}>
+              {open ? <X className="h-4 w-4" /> : <span className="flex flex-col gap-[5px]"><i className="block h-px w-4 bg-fg" /><i className="block h-px w-4 bg-fg" /></span>}
+            </button>
           </div>
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-lg hover:bg-surface/50 transition-colors"
-            aria-label="Toggle theme"
-          >
-            {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-          </button>
-          <button className="hidden md:block p-2 rounded-lg hover:bg-surface/50 transition-colors" aria-label="Connect wallet">
-            <Settings className="w-4 h-4" />
-          </button>
+        </nav>
+      </header>
+
+      {open && (
+        <div className="fixed inset-0 top-16 z-40 flex flex-col justify-between bg-bg px-5 pb-10 pt-8 lg:hidden">
+          <ul className="space-y-1">
+            {links.map((l, i) => (
+              <li key={l.href} className="fade-up" style={{ animationDelay: `${i * 60}ms` }}>
+                <Link href={l.href} onClick={() => setOpen(false)} className={`font-display block text-6xl leading-[1.05] ${isActive(l.href) ? 'text-accent' : ''}`}>
+                  {l.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="eyebrow">{activeCluster.label} · on-chain registry for AI agents</p>
         </div>
-      </div>
-    </nav>
+      )}
+    </>
   );
 }

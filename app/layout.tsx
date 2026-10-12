@@ -1,22 +1,25 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import "@fontsource/instrument-serif/400.css";
+import "@fontsource/instrument-serif/400-italic.css";
 import "./globals.css";
 import { Navigation } from "@/components/Navigation";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { Footer } from "@/components/Footer";
+import { Providers } from "@/lib/state/client";
+import { ToastProvider } from "@/components/ui/Toast";
+import { SmoothScroll } from "@/components/SmoothScroll";
+import { Cursor } from "@/components/Cursor";
 
 export const metadata: Metadata = {
-  title: "AgentNS - Explorer",
-  description: "AI Agent Name Registry Explorer",
+  title: "AgentNS — Names for machines",
+  description:
+    "Look up any AI agent by name, capability or owner wallet and verify its stake, endpoint and track record on Solana before you trust it.",
 };
+
+// Runs before paint so the saved theme never flashes.
+const themeScript = `try{if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light')}catch(e){}`;
 
 export default function RootLayout({
   children,
@@ -26,21 +29,24 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased bg-explorer`}
+      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body
-        className="min-h-full flex flex-col bg-explorer"
-        suppressHydrationWarning
-      >
-        <Navigation />
-        <main className="flex-1 p-6">
-          {children}
-        </main>
-        <footer className="border-t border-explorer py-6 bg-surface text-text-muted text-center">
-          <p className="text-sm">
-            Devnet only. Test money.
-          </p>
-        </footer>
+      <head suppressHydrationWarning>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="flex min-h-full flex-col bg-bg text-fg" suppressHydrationWarning>
+        <Providers>
+          <ToastProvider>
+            <SmoothScroll />
+            <Cursor />
+            <Suspense fallback={<div className="h-16" />}>
+              <Navigation />
+            </Suspense>
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </ToastProvider>
+        </Providers>
       </body>
     </html>
   );

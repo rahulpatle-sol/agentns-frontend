@@ -1,238 +1,371 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Activity, BadgeCheck, Bot, Coins, RotateCcw, Search, X } from 'lucide-react';
 import { DataTable } from '@/components/DataTable';
+import type { DataTableColumn } from '@/components/DataTable';
 import { StatCard } from '@/components/StatCard';
 import { ScrollableFeed } from '@/components/ScrollableFeed';
-import { listAgents, getStats } from '@/lib/data/provider';
-import type { Agent, Filters, Stats } from '@/lib/data/types';
-import type { DataTableColumn } from '@/components/DataTable';
+import { BadgeTrust } from '@/components/BadgeTrust';
+import { AgentAvatar } from '@/components/AgentAvatar';
+import { EmptyState } from '@/components/EmptyState';
+import { Alert } from '@/components/ui/Form';
+import { NetworkCanvas } from '@/components/NetworkCanvas';
+import { Reveal } from '@/components/Reveal';
+import { Marquee } from '@/components/Marquee';
+import { useAllAgents, useRecentTransactions } from '@/lib/state/queries';
+import type { OwnedRecord } from '@/lib/state/queries';
+import { passRate, trustBadge } from '@/lib/trust';
+import { MetadataUploader } from '@/components/MetadataUploader';
+import { activeCluster, agentnsProgramId } from '@/lib/config';
+import { lamportsToSol, shortenAddress } from '@/lib/format';
+
+const SHOWCASE = ['mcp://sentiment.text-analysis.acme.v1.0', 'mcp://web-search.lucide.v1.0', 'a2a://planner.orchestration.demo.v1.0'];
+
+type Filters = { capability?: string; minStake: number; showRevoked: boolean };
+const DEFAULT_FILTERS: Filters = { capability: undefined, minStake: 0, showRevoked: false };
 
 export default function Home() {
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loadingAgents, setLoadingAgents] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<Filters>({
-    capability: undefined,
-    protocol: undefined,
-    badge: undefined,
-    minStake: 0,
-    showUnverified: false,
-  });
+  const router = useRouter();
+  const { data: agents, error, isLoading, mutate } = useAllAgents();
+  const { data: txs } = useRecentTransactions(50);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoadingAgents(true);
-    setError(null);
+  const all = useMemo(() => agents ?? [], [agents]);
 
-    const debounce = setTimeout(() => {
-      void listAgents(filters)
-        .then((results) => {
-          if (!cancelled) setAgents(results);
-        })
-        .catch((loadError: unknown) => {
-          if (!cancelled) {
-            setError(loadError instanceof Error ? loadError.message : 'Unable to load agents.');
-          }
-        })
-        .finally(() => {
-          if (!cancelled) setLoadingAgents(false);
-        });
-    }, 300);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(debounce);
-    };
-  }, [filters]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void getStats()
-      .then((result) => {
-        if (!cancelled) setStats(result);
-      })
-      .catch((loadError: unknown) => {
-        if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : 'Unable to load stats.');
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const lowerSearchQuery = searchQuery.toLowerCase();
-  const filteredAgents = agents.filter((agent) =>
-    !lowerSearchQuery ||
-    agent.name.toLowerCase().includes(lowerSearchQuery) ||
-    agent.capability.toLowerCase().includes(lowerSearchQuery) ||
-    agent.owner.toLowerCase().includes(lowerSearchQuery)
+  const stats = useMemo(
+    () => ({
+      totalAgents: all.length,
+      totalStakedSOL: all.reduce((sum, a) => sum + lamportsToSol(a.stakeLamports), 0),
+      verifiedAgents: all.filter((a) => a.endpointVerified).length,
+      recentTxs: txs?.length ?? 0,
+    }),
+    [all, txs],
   );
 
-  const columns: DataTableColumn<Agent>[] = [
-    { key: 'name', label: 'Agent', sortable: true },
-    { key: 'capability', label: 'Capability', sortable: true },
-    { key: 'badge', label: 'Badge', sortable: true },
+  const capabilities = useMemo(() => Array.from(new Set(all.map((a) => a.capability))).sort().slice(0, 8), [all]);
+  const maxStake = Math.max(1, Math.ceil(Math.max(0, ...all.map((a) => lamportsToSol(a.stakeLamports)))));
+
+  const q = searchQuery.trim().toLowerCase();
+  const rows = useMemo(
+    () =>
+      all.filter(
+        (a) =>
+          (filters.showRevoked || a.status !== 'revoked') &&
+          (!filters.capability || a.capability === filters.capability) &&
+          lamportsToSol(a.stakeLamports) >= filters.minStake &&
+          (!q || a.name.toLowerCase().includes(q) || a.capability.toLowerCase().includes(q) || a.owner.toLowerCase().includes(q)),
+      ),
+    [all, filters, q],
+  );
+
+  const hasActiveFilters = !!searchQuery || !!filters.capability || filters.minStake > 0 || filters.showRevoked;
+  const resetAll = () => {
+    setSearchQuery('');
+    setFilters(DEFAULT_FILTERS);
+  };
+
+  const columns: DataTableColumn<OwnedRecord>[] = [
+    {
+      key: 'name',
+      label: 'Agent',
+      sortable: true,
+      render: (_v, agent) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <AgentAvatar name={agent.agentId} />
+          <div className="min-w-0">
+            <p className="font-medium capitalize leading-tight">{agent.agentId}</p>
+            <p className="mt-0.5 max-w-[260px] truncate font-mono text-xs text-muted" title={agent.name}>
+              {agent.name}
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'capability',
+      label: 'Capability',
+      sortable: true,
+      render: (v) => (
+        <span className="rounded-md bg-fg/5 px-2 py-1 font-mono text-xs text-fg/80">{String(v)}</span>
+      ),
+    },
+    {
+      key: 'badge',
+      label: 'Trust',
+      sortable: true,
+      render: (_v, agent) => <BadgeTrust badge={trustBadge(agent)} size="sm" />,
+    },
     {
       key: 'stakeLamports',
-      label: 'Stake (SOL)',
+      label: 'Stake',
       sortable: true,
-      render: (value) => `${(Number(value) / 1_000_000_000).toFixed(2)} SOL`,
+      align: 'right',
+      render: (v) => (
+        <span className="font-mono tabular-nums">
+          {(Number(v) / 1_000_000_000).toFixed(2)} <span className="text-muted">SOL</span>
+        </span>
+      ),
     },
-    { key: 'passes', label: 'Passes', sortable: true },
-    { key: 'fails', label: 'Fails', sortable: true },
+    {
+      key: 'passes',
+      label: 'Pass rate',
+      sortable: true,
+      render: (_v, agent) => {
+        const rate = passRate(agent);
+        if (rate === null) return <span className="text-xs text-muted">No challenges</span>;
+        const tone = rate >= 90 ? 'bg-ok' : rate >= 70 ? 'bg-warn' : 'bg-bad';
+        return (
+          <div className="flex items-center gap-3">
+            <div className="h-1.5 w-20 overflow-hidden rounded-full bg-fg/10">
+              <div className={`h-full rounded-full ${tone}`} style={{ width: `${rate}%` }} />
+            </div>
+            <span className="font-mono text-xs tabular-nums text-muted">{rate.toFixed(0)}%</span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'owner',
+      label: 'Owner',
+      render: (v) => <span className="font-mono text-xs text-muted">{shortenAddress(String(v), 4, 4)}</span>,
+    },
   ];
 
   return (
-    <section className="py-12">
-      <div className="max-w-7xl mx-auto">
-        {/* Hero Section */}
-        <div className="mb-12">
-          <h1 className="text-4xl font-bold tracking-tighter text-explorer mb-4">
-            Check an agent before you trust it
-          </h1>
-          <p className="text-muted text-lg mb-6">
-            Search an agent name, capability, or owner wallet to view details
+    <>
+      {/* ───────── Hero ───────── */}
+      <section className="relative overflow-hidden border-b border-line">
+        <NetworkCanvas realCount={stats.totalAgents} />
+        <div className="relative mx-auto max-w-[1500px] px-5 pb-20 pt-24 sm:px-8 sm:pt-32">
+          <p className="eyebrow fade-up flex items-center justify-center gap-2">
+            <span className="ping-dot relative h-1.5 w-1.5 rounded-full bg-ok" />
+            Live on Solana {activeCluster.label}
           </p>
-          
-          {/* Example searches */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <button 
-              onClick={() => setSearchQuery('mcp://sentiment.text-analysis.acme.v1.0')}
-              className="p-2 rounded bg-surface hover:bg-accent/10 transition-colors text-sm text-explorer cursor-pointer"
-            >
-              mcp://sentiment.text-analysis.acme.v1.0
-            </button>
-            <button 
-              onClick={() => setSearchQuery('mcp://trading-signals.alchemy.v1.0')}
-              className="p-2 rounded bg-surface hover:bg-accent/10 transition-colors text-sm text-explorer cursor-pointer"
-            >
-              mcp://trading-signals.alchemy.v1.0
-            </button>
-            <button 
-              onClick={() => setSearchQuery('mcp://code-review.backend.acme.v1.0')}
-              className="p-2 rounded bg-surface hover:bg-accent/10 transition-colors text-sm text-explorer cursor-pointer"
-            >
-              mcp://code-review.backend.acme.v1.0
-            </button>
-            <button 
-              onClick={() => setSearchQuery('mcp://web-search.lucide.v1.0')}
-              className="p-2 rounded bg-surface hover:bg-accent/10 transition-colors text-sm text-explorer cursor-pointer"
-            >
-              mcp://web-search.lucide.v1.0
-            </button>
+
+          <h1 className="mx-auto mt-8 max-w-4xl text-balance text-center text-[clamp(2.75rem,8vw,6.5rem)] leading-[0.95] tracking-tight">
+            <span className="rise-mask">
+              <span className="rise">Check an agent</span>
+            </span>
+            <span className="rise-mask">
+              <span className="rise font-display italic text-accent" style={{ animationDelay: '0.12s' }}>
+                before you trust it.
+              </span>
+            </span>
+          </h1>
+          <p className="fade-up delay-2 mx-auto mt-7 max-w-xl text-pretty text-center text-base leading-relaxed text-muted sm:text-lg">
+            Search any agent name, capability or owner wallet and verify its stake, endpoint and on-chain track record in
+            seconds.
+          </p>
+
+          <div className="fade-up delay-3 mx-auto mt-12 max-w-2xl">
+            <div className="glass group relative flex items-center p-1.5 transition-colors focus-within:border-accent/60">
+              <Search className="pointer-events-none ml-4 h-5 w-5 shrink-0 text-muted" />
+              <input
+                id="hero-search"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="agent name, capability or owner wallet…"
+                className="h-12 w-full bg-transparent px-3 font-mono text-sm outline-none placeholder:text-muted/70"
+                aria-label="Search agents"
+                autoComplete="off"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="mr-1 grid h-8 w-8 shrink-0 place-items-center text-muted hover:text-fg"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+              <a href="#agents" className="btn-primary hidden h-12 shrink-0 items-center px-6 text-sm sm:inline-flex">
+                Resolve
+              </a>
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              <span className="eyebrow">{all.length ? 'Try' : 'e.g.'}</span>
+              {(all.length ? all.slice(0, 3).map((a) => a.name) : SHOWCASE).map((ex) => (
+                <button
+                  key={ex}
+                  onClick={() => setSearchQuery(ex)}
+                  className="border border-line px-3 py-1.5 font-mono text-[11px] text-fg/80 transition-colors hover:border-accent hover:text-fg"
+                >
+                  {ex.replace(/^[a-z0-9]+:\/\//, '')}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ───────── Ticker ───────── */}
+      <div className="border-b border-line py-5">
+        <Marquee
+          items={[
+            <span key="1" className="eyebrow">On-chain name registry</span>,
+            <span key="2" className="eyebrow">·</span>,
+            <span key="3" className="eyebrow">Stake-weighted trust</span>,
+            <span key="4" className="eyebrow">·</span>,
+            <span key="5" className="eyebrow">Endpoint verification</span>,
+            <span key="6" className="eyebrow">·</span>,
+            <span key="7" className="eyebrow">Revocable reputation</span>,
+            <span key="8" className="eyebrow">·</span>,
+            <span key="9" className="eyebrow">Solana {activeCluster.label}</span>,
+            <span key="10" className="eyebrow">·</span>,
+          ]}
+        />
+      </div>
+
+      {/* ───────── Stats ───────── */}
+      <section className="mx-auto max-w-[1500px] px-5 pt-16 sm:px-8">
+        <div className="grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+          <Reveal>
+            <StatCard title="Total agents" value={stats.totalAgents} subtitle="Registered on-chain" icon={Bot} />
+          </Reveal>
+          <Reveal delay={100}>
+            <StatCard title="Total staked" value={Number(stats.totalStakedSOL.toFixed(2))} subtitle="SOL locked" icon={Coins} />
+          </Reveal>
+          <Reveal delay={200}>
+            <StatCard title="Verified agents" value={stats.verifiedAgents} subtitle="Endpoint verified" icon={BadgeCheck} />
+          </Reveal>
+          <Reveal delay={300}>
+            <StatCard title="Recent txs" value={stats.recentTxs} subtitle="Last 50 signatures" icon={Activity} />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ───────── Agents + Activity ───────── */}
+      <section id="agents" className="mx-auto mt-16 max-w-7xl scroll-mt-24 px-6">
+        <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Trusted agents</h2>
+            <p className="mt-1 text-sm text-muted">Read live from the AgentNS program on {activeCluster.label}.</p>
           </div>
         </div>
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
-          <StatCard
-            title="Total agents"
-            value={stats?.totalAgents ?? 0}
-            subtitle="Active + Revoked"
-          />
-          <StatCard
-            title="Total staked"
-            value={stats?.totalStakedSOL ?? 0}
-            subtitle="SOL"
-          />
-          <StatCard
-            title="Verified agents"
-            value={stats?.verifiedAgents ?? 0}
-            subtitle="with endpoint verified"
-          />
-          <StatCard
-            title="Checks 24h"
-            value={stats?.checks24h ?? 0}
-            subtitle="on-chain"
-          />
-        </div>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 space-y-4">
+            {/* Filter bar */}
+            <div className="card flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Capability filter">
+                {[undefined, ...capabilities].map((cap) => {
+                  const active = filters.capability === cap;
+                  return (
+                    <button
+                      key={cap ?? 'all'}
+                      onClick={() => setFilters((prev) => ({ ...prev, capability: cap }))}
+                      aria-pressed={active}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                        active
+                          ? 'bg-accent text-white shadow-md shadow-accent/30'
+                          : 'border border-line bg-fg/[0.03] text-muted hover:border-line-strong hover:text-fg'
+                      }`}
+                    >
+                      {cap ?? 'All'}
+                    </button>
+                  );
+                })}
+              </div>
 
-        {/* Agent Table */}
-        <div className="grid grid-cols-1 lg:grid-cols-[350px]_1fr gap-8">
-          {/* Left column: Agent Table */}
-          <div>
-            <h2 className="text-xl font-medium text-explorer mb-4">Trusted agents</h2>
-            
-            <div className="bg-surface rounded-xl border border-explorer p-4 mb-6">
-              <form 
-                className="grid grid-cols-2 gap-4 mb-4"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.target as HTMLFormElement);
-                  const capability = formData.get('capability') as string;
-                  if (capability) {
-                    setFilters(prev => ({ ...prev, capability }));
-                  } else {
-                    setFilters(prev => ({ ...prev, capability: undefined }));
-                  }
-                }}
-              >
-                <select
-                  value={filters.capability || ''}
-                  onChange={(e) => setFilters(prev => ({ ...prev, capability: e.target.value || undefined }))}
-                  className="w-full rounded bg-explorer border border-explorer focus:outline-none focus:ring-2 focus:ring-accent py-2 pl-3 text-sm"
-                >
-                  <option value="">All capabilities</option>
-                  <option value="text-analysis">text-analysis</option>
-                  <option value="translation">translation</option>
-                  <option value="code-review">code-review</option>
-                  <option value="web-search">web-search</option>
-                  <option value="trading-signals">trading-signals</option>
-                </select>
-                
-                <div>
-                  <label className="text-xs text-muted uppercase tracking-wider mb-1">Min stake (SOL)</label>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                <label className="flex items-center gap-3 text-xs text-muted">
+                  Min stake
                   <input
                     type="range"
-                    min="0"
-                    max="5"
-                    value={filters.minStake ?? 0}
-                    onChange={(e) => setFilters(prev => ({ ...prev, minStake: Number(e.target.value) }))}
-                    className="w-24 accent-color-accent"
+                    min={0}
+                    max={maxStake}
+                    step={0.1}
+                    value={filters.minStake}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, minStake: Number(e.target.value) }))}
+                    className="w-24 accent-accent"
                   />
-                  <span className="text-xs text-muted ml-2">{filters.minStake ?? 0} SOL</span>
-                </div>
-              </form>
-              
-              <div className="flex gap-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={filters.showUnverified}
-                    onChange={(e) => setFilters(prev => ({ ...prev, showUnverified: e.target.checked }))}
-                    className="rounded border-explorer"
-                  />
-                  <span className="text-sm text-muted">Show unverified agents</span>
+                  <span className="w-12 font-mono tabular-nums text-fg">{filters.minStake} SOL</span>
                 </label>
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="text-sm text-accent hover underline"
-                >
-                  Clear filters
-                </button>
+
+                <label className="flex cursor-pointer items-center gap-2.5 text-xs text-muted">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!!filters.showRevoked}
+                    onClick={() => setFilters((prev) => ({ ...prev, showRevoked: !prev.showRevoked }))}
+                    className={`relative h-5 w-9 rounded-full transition-colors ${
+                      filters.showRevoked ? 'bg-accent' : 'bg-fg/15'
+                    }`}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                        filters.showRevoked ? 'translate-x-4' : ''
+                      }`}
+                    />
+                  </button>
+                  Show revoked
+                </label>
+
+                {hasActiveFilters && (
+                  <button onClick={resetAll} className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline">
+                    <RotateCcw className="h-3 w-3" />
+                    Reset
+                  </button>
+                )}
               </div>
             </div>
 
-            {error && <p role="alert" className="mb-4 text-sm text-red-400">{error}</p>}
-            <DataTable
-              data={filteredAgents || []}
-              columns={columns}
-              skeletonCount={8}
-              loading={loadingAgents}
-            />
+            {error && (
+              <Alert tone="error" title="Couldn’t load agents from the network">
+                {error instanceof Error ? error.message : String(error)}{' '}
+                <button onClick={() => mutate()} className="underline">
+                  Retry
+                </button>
+                . The public devnet RPC is rate-limited — set a dedicated URL in VITE_SOLANA_RPC_URL if this keeps happening.
+              </Alert>
+            )}
+
+            {!error && !isLoading && all.length === 0 ? (
+              <div className="card">
+                <EmptyState
+                  title="No agents registered yet"
+                  description={`Nothing found for program ${shortenAddress(agentnsProgramId, 4, 4)} on ${activeCluster.label}. Be the first to register one.`}
+                />
+                <div className="-mt-8 pb-12 text-center">
+                  <Link href="/register" className="btn-primary inline-flex h-10 items-center rounded-xl px-5 text-sm font-medium">
+                    Register an agent
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <DataTable
+                title="Agents"
+                data={rows}
+                columns={columns}
+                skeletonCount={8}
+                loading={isLoading}
+                getRowKey={(a) => a.pda}
+                onRowClick={(a) => router.push(`/names/${a.pda}`)}
+                emptyMessage="No agents match your filters"
+              />
+            )}
           </div>
 
-          {/* Right column: Latest activity and Top reputation */}
-          <div>
-            <h2 className="text-xl font-medium text-explorer mb-4">Latest activity</h2>
-            <ScrollableFeed />
-          </div>
+          <aside className="min-w-0">
+            <div className="card lg:sticky lg:top-24">
+              <div className="flex items-center justify-between border-b border-line px-5 py-4">
+                <h3 className="text-base font-semibold tracking-tight">Latest activity</h3>
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+                  <span className="ping-dot relative h-1.5 w-1.5 rounded-full bg-ok" />
+                  Live
+                </span>
+              </div>
+              <ScrollableFeed />
+            </div>
+          </aside>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
