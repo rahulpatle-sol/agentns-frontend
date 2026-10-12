@@ -1,0 +1,43 @@
+{
+  "name": "AgentNS",
+  "short_name": "AgentNS",
+  "description": "On-chain name registry and trust layer for AI agents",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0b0a",
+  "theme_color": "#ff5a1f",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["technology", "developer", "utilities"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Registry",
+      "short_name": "Registry",
+      "description": "Browse all registered agents",
+      "url": "/",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Marketplace",
+      "short_name": "Marketplace",
+      "description": "Buy and sell agent names",
+      "url": "/marketplace",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Register a name",
+      "short_name": "Register",
+      "description": "Register a new agent name",
+      "url": "/register",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    }
+  ]
+}

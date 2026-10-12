@@ -1,0 +1,13 @@
+# AgentNS - On-chain name registry for AI agents
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://agentns.xyz/sitemap.xml
+
+# Crawl-delay (optional, for politeness)
+Crawl-delay: 10
+
+# Disallow admin/internal routes if any
+# Disallow: /admin/
+# Disallow: /api/
