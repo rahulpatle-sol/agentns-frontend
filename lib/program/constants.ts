@@ -17,6 +17,9 @@ export const CONFIG_SEED = new TextEncoder().encode("config");
 /** PDA seed for an agent record, used together with the 32-byte name hash. */
 export const AGENT_SEED = new TextEncoder().encode("agent");
 
+/** PDA seed for a marketplace listing, used with the agent record address. */
+export const LISTING_SEED = new TextEncoder().encode("listing");
+
 /** Anchor accounts carry an 8-byte discriminator before the struct body. */
 export const ANCHOR_DISCRIMINATOR_BYTES = 8;
 

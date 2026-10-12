@@ -18,8 +18,10 @@ import {
   agentPdaForName,
   configPda,
   decodeAgentRecord,
+  decodeListing,
   decodeRegistryConfig,
   type AgentRecord,
+  type Listing,
 } from "@/lib/program/agentns";
 
 /**
@@ -82,7 +84,9 @@ export function useRegistryConfig() {
     "agentns:config",
     async () => {
       const pda = await configPda(address(agentnsProgramId));
-      const response = await client.rpc.getAccountInfo(pda).send();
+      const response = await client.rpc
+        .getAccountInfo(pda, { encoding: "base64" })
+        .send();
       const base64 = extractBase64(response.value);
       if (!base64) return null;
       return { address: pda, config: decodeRegistryConfig(base64) };
@@ -118,7 +122,9 @@ export function useAgentRecord(pda: Address | null) {
     pda ? ["agentns:record", pda] : null,
     async () => {
       if (!pda) return null;
-      const response = await client.rpc.getAccountInfo(pda).send();
+      const response = await client.rpc
+        .getAccountInfo(pda, { encoding: "base64" })
+        .send();
       const base64 = extractBase64(response.value);
       if (!base64) return null;
       return decodeAgentRecord(base64);
@@ -139,7 +145,9 @@ export function useRecordByName(fullName: string | null) {
     async () => {
       if (!fullName) return null;
       const pda = await agentPdaForName(fullName, address(agentnsProgramId));
-      const response = await client.rpc.getAccountInfo(pda).send();
+      const response = await client.rpc
+        .getAccountInfo(pda, { encoding: "base64" })
+        .send();
       const base64 = extractBase64(response.value);
       if (!base64) return null;
       return { pda, record: decodeAgentRecord(base64) };
@@ -248,6 +256,55 @@ export function useAllAgents() {
         }
       }
       return records;
+    },
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Marketplace listings                                                        */
+/* -------------------------------------------------------------------------- */
+
+export type ListingWithPda = Listing & { pda: Address };
+
+/**
+ * Every active Listing account in the program. Filters on the 8-byte Anchor
+ * discriminator (`sha256("account:Listing")[..8]`) so agent/config accounts are
+ * skipped server-side.
+ */
+export function useListings() {
+  const client = useClient<AppClient>();
+
+  return useSWR(
+    "agentns:listings",
+    async (): Promise<ListingWithPda[]> => {
+      const disc = (await sha256(new TextEncoder().encode("account:Listing"))).slice(0, 8);
+      const response = await client.rpc
+        .getProgramAccounts(address(agentnsProgramId), {
+          encoding: "base64",
+          filters: [
+            {
+              memcmp: {
+                offset: 0n,
+                bytes: getBase58Decoder().decode(disc) as never,
+                encoding: "base58",
+              },
+            },
+          ],
+        })
+        .send();
+
+      const listings: ListingWithPda[] = [];
+      for (const account of response) {
+        const base64 = extractBase64(account.account);
+        if (!base64) continue;
+        try {
+          listings.push({ ...decodeListing(base64), pda: address(account.pubkey) });
+        } catch {
+          /* undecodable (older layout) — skip rather than crash the list */
+        }
+      }
+      return listings.sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
     },
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );

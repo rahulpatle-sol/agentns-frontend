@@ -24,6 +24,7 @@ import {
   AGENT_STATUS,
   AGENT_STATUS_INDEX,
   CONFIG_SEED,
+  LISTING_SEED,
   MAX_VERIFIERS,
   PROTOCOL_INDEX,
   PROGRAM_ID,
@@ -413,6 +414,146 @@ export async function getInitializeConfigInstruction(
 /** Maps `AgentStatus` to the discriminant the program compares against. */
 export const agentStatusIndex = (status: AgentStatus): number =>
   AGENT_STATUS_INDEX[status];
+
+/* -------------------------------------------------------------------------- */
+/* Marketplace (Phase 3)                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** Decoded `state.rs::Listing` — an offer to sell one name at a fixed price. */
+export type Listing = {
+  seller: Address;
+  agentRecord: Address;
+  priceLamports: bigint;
+  createdAt: bigint;
+  bump: number;
+};
+
+/** Reads a base64 account payload into `Listing`, in `state.rs` field order. */
+export function decodeListing(base64: string): Listing {
+  const reader = new BorshReader(base64ToBytes(base64));
+  reader.bytes(8); // Anchor discriminator.
+  return {
+    seller: readAddress(reader),
+    agentRecord: readAddress(reader),
+    priceLamports: reader.u64(),
+    createdAt: reader.i64(),
+    bump: reader.u8(),
+  };
+}
+
+/** The listing PDA for one agent record: seeds `["listing", agent_record]`. */
+export async function listingPda(
+  agentRecord: Address,
+  programId: Address = programAddress,
+): Promise<Address> {
+  const [pda] = await getProgramDerivedAddress({
+    programAddress: programId,
+    seeds: [LISTING_SEED, getAddressEncoder().encode(agentRecord)],
+  });
+  return pda;
+}
+
+/** Accounts `list_name` needs, in the order declared in list_name.rs. */
+export type ListNameAccounts = {
+  owner: Address;
+  agentRecord: Address;
+  listing: Address;
+};
+
+/**
+ * Builds `list_name`. Places the record up for sale at a fixed price.
+ *
+ * Account order follows `instructions/list_name.rs`: owner, agent_record,
+ * listing, system_program.
+ */
+export async function getListNameInstruction(
+  priceLamports: bigint,
+  accounts: ListNameAccounts,
+  programId: Address = programAddress,
+): Promise<Instruction> {
+  const data = new BorshWriter()
+    .raw(await instructionDiscriminator("list_name"))
+    .u64(priceLamports)
+    .toBytes();
+
+  return {
+    programAddress: programId,
+    accounts: [
+      { address: accounts.owner, role: AccountRole.WRITABLE_SIGNER },
+      { address: accounts.agentRecord, role: AccountRole.WRITABLE },
+      { address: accounts.listing, role: AccountRole.WRITABLE },
+      { address: SYSTEM_PROGRAM_ID, role: AccountRole.READONLY },
+    ],
+    data,
+  };
+}
+
+/** Accounts `cancel_listing` needs, in the order declared in cancel_listing.rs. */
+export type CancelListingAccounts = {
+  seller: Address;
+  listing: Address;
+  agentRecord: Address;
+};
+
+/** Builds `cancel_listing` — closes the listing account, rent back to seller. */
+export async function getCancelListingInstruction(
+  accounts: CancelListingAccounts,
+  programId: Address = programAddress,
+): Promise<Instruction> {
+  const data = new BorshWriter()
+    .raw(await instructionDiscriminator("cancel_listing"))
+    .toBytes();
+
+  return {
+    programAddress: programId,
+    accounts: [
+      { address: accounts.seller, role: AccountRole.WRITABLE_SIGNER },
+      { address: accounts.listing, role: AccountRole.WRITABLE },
+      { address: accounts.agentRecord, role: AccountRole.READONLY },
+      { address: SYSTEM_PROGRAM_ID, role: AccountRole.READONLY },
+    ],
+    data,
+  };
+}
+
+/** Accounts `buy_name` needs, in the order declared in buy_name.rs. */
+export type BuyNameAccounts = {
+  buyer: Address;
+  config: Address;
+  treasury: Address;
+  seller: Address;
+  agentRecord: Address;
+  listing: Address;
+};
+
+/**
+ * Builds `buy_name`. `maxPriceLamports` is the buyer's slippage guard — the
+ * program rejects the trade if the listing price rose above it.
+ */
+export async function getBuyNameInstruction(
+  maxPriceLamports: bigint,
+  accounts: BuyNameAccounts,
+  programId: Address = programAddress,
+): Promise<Instruction> {
+  const data = new BorshWriter()
+    .raw(await instructionDiscriminator("buy_name"))
+    .u64(maxPriceLamports)
+    .toBytes();
+
+  return {
+    programAddress: programId,
+    accounts: [
+      { address: accounts.buyer, role: AccountRole.WRITABLE_SIGNER },
+      { address: accounts.config, role: AccountRole.READONLY },
+      { address: accounts.treasury, role: AccountRole.WRITABLE },
+      { address: accounts.seller, role: AccountRole.WRITABLE },
+      { address: accounts.agentRecord, role: AccountRole.WRITABLE },
+      { address: accounts.listing, role: AccountRole.WRITABLE },
+      { address: SYSTEM_PROGRAM_ID, role: AccountRole.READONLY },
+    ],
+    data,
+  };
+}
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                     */

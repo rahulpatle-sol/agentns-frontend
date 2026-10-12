@@ -12,9 +12,13 @@ import { BadgeTrust } from '@/components/BadgeTrust';
 import { AgentAvatar } from '@/components/AgentAvatar';
 import { EmptyState } from '@/components/EmptyState';
 import { Alert } from '@/components/ui/Form';
+import { NetworkCanvas } from '@/components/NetworkCanvas';
+import { Reveal } from '@/components/Reveal';
+import { Marquee } from '@/components/Marquee';
 import { useAllAgents, useRecentTransactions } from '@/lib/state/queries';
 import type { OwnedRecord } from '@/lib/state/queries';
 import { passRate, trustBadge } from '@/lib/trust';
+import { MetadataUploader } from '@/components/MetadataUploader';
 import { activeCluster, agentnsProgramId } from '@/lib/config';
 import { lamportsToSol, shortenAddress } from '@/lib/format';
 
@@ -134,55 +138,63 @@ export default function Home() {
   return (
     <>
       {/* ───────── Hero ───────── */}
-      <section className="hero">
-        <div className="mx-auto max-w-7xl px-6 pb-16 pt-20 text-center sm:pt-28">
-          <div className="fade-up inline-flex items-center gap-2 rounded-full border border-line bg-surface/60 px-3.5 py-1.5 text-xs font-medium text-muted backdrop-blur">
+      <section className="relative overflow-hidden border-b border-line">
+        <NetworkCanvas realCount={stats.totalAgents} />
+        <div className="relative mx-auto max-w-[1500px] px-5 pb-20 pt-24 sm:px-8 sm:pt-32">
+          <p className="eyebrow fade-up flex items-center justify-center gap-2">
             <span className="ping-dot relative h-1.5 w-1.5 rounded-full bg-ok" />
             Live on Solana {activeCluster.label}
-          </div>
+          </p>
 
-          <h1 className="fade-up delay-1 mx-auto mt-7 max-w-3xl text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-7xl">
-            Check an agent <span className="text-gradient">before you trust it</span>
+          <h1 className="mx-auto mt-8 max-w-4xl text-balance text-center text-[clamp(2.75rem,8vw,6.5rem)] leading-[0.95] tracking-tight">
+            <span className="rise-mask">
+              <span className="rise">Check an agent</span>
+            </span>
+            <span className="rise-mask">
+              <span className="rise font-display italic text-accent" style={{ animationDelay: '0.12s' }}>
+                before you trust it.
+              </span>
+            </span>
           </h1>
-          <p className="fade-up delay-2 mx-auto mt-6 max-w-xl text-pretty text-lg leading-relaxed text-muted">
+          <p className="fade-up delay-2 mx-auto mt-7 max-w-xl text-pretty text-center text-base leading-relaxed text-muted sm:text-lg">
             Search any agent name, capability or owner wallet and verify its stake, endpoint and on-chain track record in
             seconds.
           </p>
 
-          <div className="fade-up delay-3 mx-auto mt-10 max-w-2xl">
-            <div className="glass group relative flex items-center rounded-2xl p-1.5 shadow-2xl shadow-accent/10 transition-shadow focus-within:border-accent/50 focus-within:shadow-accent/25">
+          <div className="fade-up delay-3 mx-auto mt-12 max-w-2xl">
+            <div className="glass group relative flex items-center p-1.5 transition-colors focus-within:border-accent/60">
               <Search className="pointer-events-none ml-4 h-5 w-5 shrink-0 text-muted" />
               <input
                 id="hero-search"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search agent name, capability or owner wallet…"
-                className="h-12 w-full bg-transparent px-3 text-base outline-none placeholder:text-muted/70"
+                placeholder="agent name, capability or owner wallet…"
+                className="h-12 w-full bg-transparent px-3 font-mono text-sm outline-none placeholder:text-muted/70"
                 aria-label="Search agents"
                 autoComplete="off"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="mr-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-fg/10 hover:text-fg"
+                  className="mr-1 grid h-8 w-8 shrink-0 place-items-center text-muted hover:text-fg"
                   aria-label="Clear search"
                 >
                   <X className="h-4 w-4" />
                 </button>
               )}
-              <a href="#agents" className="btn-primary hidden h-12 shrink-0 items-center rounded-xl px-6 text-sm font-medium sm:inline-flex">
-                Search
+              <a href="#agents" className="btn-primary hidden h-12 shrink-0 items-center px-6 text-sm sm:inline-flex">
+                Resolve
               </a>
             </div>
 
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-              <span className="text-xs text-muted">{all.length ? 'Try' : 'e.g.'}</span>
+              <span className="eyebrow">{all.length ? 'Try' : 'e.g.'}</span>
               {(all.length ? all.slice(0, 3).map((a) => a.name) : SHOWCASE).map((ex) => (
                 <button
                   key={ex}
                   onClick={() => setSearchQuery(ex)}
-                  className="rounded-full border border-line bg-surface/50 px-3 py-1.5 font-mono text-[11px] text-fg/80 transition-colors hover:border-accent/50 hover:bg-accent/10 hover:text-fg"
+                  className="border border-line px-3 py-1.5 font-mono text-[11px] text-fg/80 transition-colors hover:border-accent hover:text-fg"
                 >
                   {ex.replace(/^[a-z0-9]+:\/\//, '')}
                 </button>
@@ -192,21 +204,39 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ───────── Ticker ───────── */}
+      <div className="border-b border-line py-5">
+        <Marquee
+          items={[
+            <span key="1" className="eyebrow">On-chain name registry</span>,
+            <span key="2" className="eyebrow">·</span>,
+            <span key="3" className="eyebrow">Stake-weighted trust</span>,
+            <span key="4" className="eyebrow">·</span>,
+            <span key="5" className="eyebrow">Endpoint verification</span>,
+            <span key="6" className="eyebrow">·</span>,
+            <span key="7" className="eyebrow">Revocable reputation</span>,
+            <span key="8" className="eyebrow">·</span>,
+            <span key="9" className="eyebrow">Solana {activeCluster.label}</span>,
+            <span key="10" className="eyebrow">·</span>,
+          ]}
+        />
+      </div>
+
       {/* ───────── Stats ───────── */}
-      <section className="mx-auto max-w-7xl px-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="fade-up">
+      <section className="mx-auto max-w-[1500px] px-5 pt-16 sm:px-8">
+        <div className="grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+          <Reveal>
             <StatCard title="Total agents" value={stats.totalAgents} subtitle="Registered on-chain" icon={Bot} />
-          </div>
-          <div className="fade-up delay-1">
+          </Reveal>
+          <Reveal delay={100}>
             <StatCard title="Total staked" value={Number(stats.totalStakedSOL.toFixed(2))} subtitle="SOL locked" icon={Coins} />
-          </div>
-          <div className="fade-up delay-2">
+          </Reveal>
+          <Reveal delay={200}>
             <StatCard title="Verified agents" value={stats.verifiedAgents} subtitle="Endpoint verified" icon={BadgeCheck} />
-          </div>
-          <div className="fade-up delay-3">
+          </Reveal>
+          <Reveal delay={300}>
             <StatCard title="Recent txs" value={stats.recentTxs} subtitle="Last 50 signatures" icon={Activity} />
-          </div>
+          </Reveal>
         </div>
       </section>
 

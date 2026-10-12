@@ -21,6 +21,7 @@ import { useRegistryConfig } from '@/lib/state/queries';
 import { useTransaction } from '@/lib/state/transactions/useTransaction';
 import { useWallet } from '@/lib/state/wallet';
 import { useSWRConfig } from 'swr';
+import { MetadataUploader } from '@/components/MetadataUploader';
 
 type FormState = {
   protocol: Protocol;
@@ -214,6 +215,11 @@ export default function RegisterPage() {
               <Field label="Metadata URI" hint="Optional — ipfs://… or https://…" error={err('metadataUri', errors.metadataUri)}>
                 {({ id, invalid }) => <Input id={id} invalid={invalid} value={form.metadataUri} onChange={(e) => set('metadataUri', e.target.value.trim())} placeholder="ipfs://…" />}
               </Field>
+              <MetadataUploader
+                name={partsValid ? fullName : null}
+                endpoint={form.endpoint}
+                onUploaded={(uri) => set('metadataUri', uri)}
+              />
             </div>
           </section>
 

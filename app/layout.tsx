@@ -2,14 +2,18 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import "@fontsource/instrument-serif/400.css";
+import "@fontsource/instrument-serif/400-italic.css";
 import "./globals.css";
 import { Navigation } from "@/components/Navigation";
 import { Footer } from "@/components/Footer";
 import { Providers } from "@/lib/state/client";
 import { ToastProvider } from "@/components/ui/Toast";
+import { SmoothScroll } from "@/components/SmoothScroll";
+import { Cursor } from "@/components/Cursor";
 
 export const metadata: Metadata = {
-  title: "AgentNS — Trust layer for AI agents",
+  title: "AgentNS — Names for machines",
   description:
     "Look up any AI agent by name, capability or owner wallet and verify its stake, endpoint and track record on Solana before you trust it.",
 };
@@ -28,12 +32,14 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <head>
+      <head suppressHydrationWarning>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="flex min-h-full flex-col bg-bg text-fg" suppressHydrationWarning>
         <Providers>
           <ToastProvider>
+            <SmoothScroll />
+            <Cursor />
             <Suspense fallback={<div className="h-16" />}>
               <Navigation />
             </Suspense>
